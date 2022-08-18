@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import os
+from typing import Union
 from kgcnn.data.utils import save_pickle_file, load_pickle_file, ragged_tensor_from_nested_numpy
 from kgcnn.graph.base import GraphNumpyContainer, GraphDict
 
@@ -13,38 +14,41 @@ module_logger.setLevel(logging.INFO)
 
 class MemoryGraphList:
     r"""Class to store a list of graph dictionaries in memory. Contains a python list as property :obj:`_list`.
-    The graph properties are defined by tensor-like numpy arrays for indices, attributes, labels, symbol etc. .
-    They are distributed from of a list of numpy arrays to each graph in the list via :obj:`assign_property`.
+    The graph properties are defined by tensor-like (numpy) arrays for indices, attributes, labels, symbol etc. in
+     :obj:`GraphDict`, which are the items of the list.
 
-    A list of numpy arrays can also be passed to class instances that have a reserved prefix, which is essentially
-    a shortcut to :obj:`assign_property` and must match the length of the list.
-    Prefix are `node_`, `edge_`, `graph_` `range_` and `angle_` for their node, edge and graph properties, respectively.
-    The range-attributes and range-indices are just like edge-indices but refer to a geometric annotation.
-    This allows to have geometric range-connections and topological edges separately.
-    The prefix 'range' is synonym for a geometric edge.
+    A python list of a single named property can be obtained from each :obj:`GraphDict` in :obj:`MemoryGraphList` via
+    :obj:`get` or assigned from a python list via :obj:`set` methods.
+
+    The :obj:`MemoryGraphList` further provides simple map-functionality :obj:`map_list` to apply methods for
+    each :obj:`GraphDict`, and to cast properties to tensor with :obj:`tensor`.
+
+    Cleaning the list for missing properties or empty graphs is done with :obj:`clean`.
 
     .. code-block:: python
 
         import numpy as np
         from kgcnn.data.base import MemoryGraphList
+
         data = MemoryGraphList()
         data.empty(1)
-        data.assign_property("edge_indices", [np.array([[0, 1], [1, 0]])])
-        data.assign_property("node_labels", [np.array([[0], [1]])])
-        print(data.obtain_property("edge_indices"))
-        data.assign_property("node_coordinates", [np.array([[1, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0]])])
-        print(data.obtain_property("node_coordinates"))
+        data.set("edge_indices", [np.array([[0, 1], [1, 0]])])
+        data.set("node_labels", [np.array([[0], [1]])])
+        print(data.get("edge_indices"))
+        data.set("node_coordinates", [np.array([[1, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0]])])
         data.map_list("set_range", max_distance=1.5, max_neighbours=10, self_loops=False)
+        data.clean("range_indices")  # Returns cleaned graph indices
+        print(data[0])
     """
 
     def __init__(self, input_list: list = None):
-        r"""Initialize an empty :obj:`MemoryGraphList` instance. If you want to expand the list or
-        namespace of accepted reserved graph prefix identifier, you can expand :obj:`_reserved_graph_property_prefix`.
+        r"""Initialize an empty :obj:`MemoryGraphList` instance.
 
         Args:
             input_list (list, MemoryGraphList): A list or :obj:`MemoryGraphList` of :obj:`GraphDict` items.
         """
         self._list = []
+        # Reserved graph properties will be removed.
         self._reserved_graph_property_prefix = ["node_", "edge_", "graph_", "range_", "angle_"]
         self.logger = module_logger
         if input_list is None:
@@ -54,7 +58,16 @@ class MemoryGraphList:
         if isinstance(input_list, MemoryGraphList):
             self._list = [GraphDict(x) for x in input_list._list]
 
-    def assign_property(self, key, value):
+    def assign_property(self, key: str, value: list):
+        """Assign a list of numpy arrays of a property to :obj:`GraphDict`s in this list.
+
+        Args:
+            key (str): Name of the property.
+            value (list): List of numpy arrays for property `key`.
+
+        Returns:
+            self
+        """
         if value is None:
             # We could also here remove the key from all graphs.
             return self
