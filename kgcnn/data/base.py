@@ -81,7 +81,7 @@ class MemoryGraphList:
             self._list[i].assign_property(key, x)
         return self
 
-    def obtain_property(self, key):
+    def obtain_property(self, key: str) -> Union[list, None]:
         r"""Returns a list with the values of all the graphs defined for the string property name `key`. If none of
         the graphs in the list have this property, returns None.
 
@@ -193,7 +193,7 @@ class MemoryGraphList:
             getattr(x, method)(**kwargs)
         return self
 
-    def clean(self, inputs: list):
+    def clean(self, inputs: Union[list, str]):
         r"""Given a list of property names, this method removes all elements from the internal list of
         `GraphDict` items, which do not define at least one of those properties. Meaning, only those graphs remain in
         the list which definitely define all properties specified by :obj:`inputs`.
